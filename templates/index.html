@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Online Dashboard</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" href="{{ url_for('static', filename='favicon.ico') }}" type="image/x-icon">
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        let currentPage = 1;
+        const rowsPerPage = 10; // Number of rows per page
+        let prevPageBtn = document.getElementById('prevPage');
+        let nextPageBtn = document.getElementById('nextPage');
+        let currentPageSpan = document.getElementById('currentPage');
+
+        async function fetchData() {
+            try {
+                const response = await fetch('/get_data');
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+                const data = await response.json();
+                return data;
+            } catch (error) {
+                console.error('Error fetching data:', error);
+                return [];
+            }
+        }
+
+        let barChartInstance = null;
+        async function update_barChart() {
+            try {
+                const response = await fetch('/get_call_counts'); // Fetch the call counts data
+                const callCounts = await response.json();
+
+                const labels = Object.keys(callCounts);
+                const data = Object.values(callCounts);
+
+                const barData = {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Call Count',
+                        data: data,
+                        backgroundColor: '#36A2EB'
+                    }]
+                };
+
+                const barOptions = {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true
+                        }
+                    }
+                };
+
+                if (barChartInstance) {
+                    barChartInstance.destroy(); // Destroy the previous instance
+                }
+
+                barChartInstance = new Chart(document.getElementById('barChart'), {
+                    type: 'bar',
+                    data: barData,
+                    options: barOptions
+                });
+            } catch (error) {
+                console.error('Error updating bar chart:', error);
+            }
+        }
+
+        let pieChart = null;
+        async function update_Chart(data) {
+            try {
+
+                const passCount = Object.values(data).filter(item => item.status === 'Success').length;
+                const failCount = Object.values(data).filter(item => item.status === 'Failed').length;
+                const totalCount = passCount + failCount;
+
+                const pieData = {
+                    labels: [`Online (${passCount})`, `Offline (${failCount})`],
+                    datasets: [{
+                        data: [passCount, failCount],
+                        backgroundColor: ['#4CAF50', '#CAF50']
+                    }]
+                };
+
+                const pieOptions = {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    legend: {
+                        position: 'bottom'
+                    }
+                };
+
+                if (pieChart) {
+                            pieChart.destroy(); // Destroy the previous instance
+                        }
+
+                pieChart = new Chart(document.getElementById('pieChart'), {
+                    type: 'pie',
+                    data: pieData,
+                    options: pieOptions
+                });
+            } catch (error) {
+                console.error('Error updating chart:', error);
+            }
+        }
+
+        async function update_Table(data) {
+            const startIndex = (currentPage - 1) * rowsPerPage;
+            const endIndex = startIndex + rowsPerPage;
+            const tableBody = document.getElementById('table-body');
+
+            tableBody.innerHTML = '';
+            let rowNumber = 1; // Initialize row number
+            try {
+                for (const ip in data) {
+                    const item = data[ip];
+                    const row = `
+                        <tr>
+                            <td>${rowNumber}</td>
+                            <td>${ip}</td>
+                            <td>
+                                ${item.status === 'Success' ? '<button class="pass-button">Online</button>' : '<button class="fail-button">Offline</button>'}
+                            </td>
+                            <td>${item.timestamp}</td>
+                        </tr>
+                    `;
+                    if(rowNumber <= currentPage * rowsPerPage){
+                        if((currentPage-1)*rowsPerPage < rowNumber){
+                        tableBody.insertAdjacentHTML('beforeend', row);
+                        }
+                    }
+                    rowNumber++; // Increment row number
+                };
+            } catch (error) {
+                console.error('Error updating table:', error);
+            }
+
+            currentPageSpan.textContent = `Page ${currentPage}`;
+            prevPageBtn.disabled = currentPage === 1;
+            nextPageBtn.disabled = endIndex >= data.length;
+        }
+
+        function toggleDetails(id) {
+            var details = document.getElementById(id);
+            details.style.display = (details.style.display === 'none') ? 'table-row' : 'none';
+        }
+
+        // Update data and chart every 30 seconds
+        setInterval(async () => {
+            const data = await fetchData();
+            if(data.length!=0) {
+                update_Chart(data);
+                update_barChart();
+                update_Table(data);
+            }
+        }, 30000);
+
+        // Initial data load and chart creation
+        async function initialize() {
+            const data = await fetchData();
+            update_Chart(data);
+            update_barChart();
+            update_Table(data);
+        }
+
+        initialize();
+    </script>
+</head>
+<body>
+    <h1>Ping Report</h1>
+    <div class="container">
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Number</th>
+                        <th>IP Address</th>
+                        <th>Status</th>
+                        <th>Timestamp</th>
+                    </tr>
+                </thead>
+                <tbody id="table-body">
+                    <!-- Fetched data will be inserted here -->
+                </tbody>
+            </table>
+            <div id="pagination">
+                <button id="prevPage">Previous</button>
+                <span id="currentPage">Page 1</span>
+                <button id="nextPage">Next</button>
+            </div>
+         </div>
+
+        <div class="chart-container">
+            <canvas id="pieChart"></canvas>
+        </div>
+        <div class="barchart-container">
+            <canvas id="barChart"></canvas>
+        </div>
+    </div>
+</body>
+</html>
