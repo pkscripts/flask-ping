@@ -6,5 +6,6 @@ List of IP address are given in the json file "ip_list.json" as dictionary.
 <br/>
 Run the py file "app_ping_server.py" on Python 3.10 + 
 
-![image](https://github.com/Pandiyarajk/flask_ping_ipmonitor/assets/39190205/01222de7-4b81-497d-82f6-962faf49429a)
+
+![ping results](https://github.com/pkscripts/flask-ping/assets/160330215/57d43169-0962-41c2-83f7-e25221e47419)
 
